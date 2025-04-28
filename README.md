@@ -107,6 +107,11 @@ We provide detailed step-by-step examples for running inference of our pre-train
 **Test inference without a robot**: We provide a [script](examples/simple_client/README.md) for testing inference without a robot. This script will generate a random observation and run inference with the model. See [here](examples/simple_client/README.md) for more details.
 
 
+### Running the UR5E policy
+
+```
+uv run scripts/serve_policy.py --env UR5E
+```
 
 
 
@@ -188,4 +193,3 @@ We will collect common issues and their solutions here. If you encounter an issu
 | CUDA/GPU errors                           | Verify NVIDIA drivers and CUDA toolkit are installed correctly. For Docker, ensure nvidia-container-toolkit is installed. Check GPU compatibility.                                           |
 | Import errors when running examples       | Make sure you've installed all dependencies with `uv sync` and activated the virtual environment. Some examples may have additional requirements listed in their READMEs.                    |
 | Action dimensions mismatch                | Verify your data processing transforms match the expected input/output dimensions of your robot. Check the action space definitions in your policy classes.                                  |
-
