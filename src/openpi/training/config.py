@@ -103,6 +103,8 @@ class ModelTransformFactory(GroupFactory):
 
     # If provided, will determine the default prompt that be used by the model.
     default_prompt: str | None = None
+    fast_model_tokenizer: Any | None = None
+    fast_model_tokenizer_kwargs: dict[str, Any] | None = None
 
     def __call__(self, model_config: _model.BaseModelConfig) -> _transforms.Group:
         match model_config.model_type:
@@ -117,17 +119,21 @@ class ModelTransformFactory(GroupFactory):
                     ],
                 )
             case _model.ModelType.PI0_FAST:
+                tokenizer_cls = (
+                    _tokenizer.FASTTokenizer if self.fast_model_tokenizer is None else self.fast_model_tokenizer
+                )
+                tokenizer_kwargs = {} if self.fast_model_tokenizer_kwargs is None else self.fast_model_tokenizer_kwargs
                 return _transforms.Group(
                     inputs=[
                         _transforms.InjectDefaultPrompt(self.default_prompt),
                         _transforms.ResizeImages(224, 224),
                         _transforms.TokenizeFASTInputs(
-                            _tokenizer.FASTTokenizer(model_config.max_token_len),
+                            tokenizer_cls(model_config.max_token_len, **tokenizer_kwargs),
                         ),
                     ],
                     outputs=[
                         _transforms.ExtractFASTActions(
-                            _tokenizer.FASTTokenizer(model_config.max_token_len),
+                            tokenizer_cls(model_config.max_token_len, **tokenizer_kwargs),
                             action_horizon=model_config.action_horizon,
                             action_dim=model_config.action_dim,
                         )
@@ -510,6 +516,140 @@ _CONFIGS = [
             assets=AssetsConfig(asset_id="droid"),
             data_transforms=lambda model: _transforms.Group(
                 inputs=[droid_policy.DroidInputs(action_dim=model.action_dim, model_type=ModelType.PI0_FAST)],
+                outputs=[droid_policy.DroidOutputs()],
+            ),
+            base_config=DataConfig(
+                prompt_from_task=True,
+            ),
+        ),
+    ),
+    TrainConfig(
+        name="pi0_droid_jointpos",
+        model=pi0.Pi0Config(action_horizon=10),
+        data=SimpleDataConfig(
+            assets=AssetsConfig(asset_id="droid"),
+            data_transforms=lambda model: _transforms.Group(
+                inputs=[droid_policy.DroidInputs(action_dim=model.action_dim)],
+                outputs=[_transforms.AbsoluteActions(_transforms.make_bool_mask(7, -1)), droid_policy.DroidOutputs()],
+            ),
+            base_config=DataConfig(
+                prompt_from_task=True,
+            ),
+        ),
+    ),
+    TrainConfig(
+        name="pi0_fast_droid_jointpos",
+        model=pi0_fast.Pi0FASTConfig(action_dim=8, action_horizon=10),
+        data=SimpleDataConfig(
+            assets=AssetsConfig(asset_id="droid"),
+            data_transforms=lambda model: _transforms.Group(
+                inputs=[droid_policy.DroidInputs(action_dim=model.action_dim, model_type=ModelType.PI0_FAST)],
+                outputs=[
+                    _transforms.AbsoluteActions(_transforms.make_bool_mask(7, -1)),
+                    droid_policy.DroidOutputs(),
+                ],
+            ),
+            base_config=DataConfig(
+                prompt_from_task=True,
+            ),
+        ),
+    ),
+    TrainConfig(
+        name="paligemma_binning_droid",
+        model=pi0_fast.Pi0FASTConfig(action_dim=8, action_horizon=15, max_token_len=400),
+        data=SimpleDataConfig(
+            assets=AssetsConfig(asset_id="droid"),
+            data_transforms=lambda model: _transforms.Group(
+                inputs=[droid_policy.DroidInputs(action_dim=model.action_dim, model_type=ModelType.PI0_FAST)],
+                outputs=[droid_policy.DroidOutputs()],
+            ),
+            base_config=DataConfig(
+                prompt_from_task=True,
+            ),
+            model_transforms=ModelTransformFactory(
+                fast_model_tokenizer=_tokenizer.BinningTokenizer,
+            ),
+        ),
+    ),
+    TrainConfig(
+        name="paligemma_binning_droid_jointpos",
+        model=pi0_fast.Pi0FASTConfig(action_dim=8, action_horizon=15, max_token_len=400),
+        data=SimpleDataConfig(
+            assets=AssetsConfig(asset_id="droid"),
+            data_transforms=lambda model: _transforms.Group(
+                inputs=[droid_policy.DroidInputs(action_dim=model.action_dim, model_type=ModelType.PI0_FAST)],
+                outputs=[
+                    _transforms.AbsoluteActions(_transforms.make_bool_mask(7, -1)),
+                    droid_policy.DroidOutputs(),
+                ],
+            ),
+            base_config=DataConfig(
+                prompt_from_task=True,
+            ),
+            model_transforms=ModelTransformFactory(
+                fast_model_tokenizer=_tokenizer.BinningTokenizer,
+            ),
+        ),
+    ),
+    TrainConfig(
+        name="paligemma_fast_droid",
+        model=pi0_fast.Pi0FASTConfig(action_dim=8, action_horizon=15),
+        data=SimpleDataConfig(
+            assets=AssetsConfig(asset_id="droid"),
+            data_transforms=lambda model: _transforms.Group(
+                inputs=[droid_policy.DroidInputs(action_dim=model.action_dim, model_type=ModelType.PI0_FAST)],
+                outputs=[droid_policy.DroidOutputs()],
+            ),
+            base_config=DataConfig(
+                prompt_from_task=True,
+            ),
+        ),
+    ),
+    TrainConfig(
+        name="paligemma_fast_specialist_droid",
+        model=pi0_fast.Pi0FASTConfig(action_dim=8, action_horizon=15),
+        data=SimpleDataConfig(
+            assets=AssetsConfig(asset_id="droid"),
+            data_transforms=lambda model: _transforms.Group(
+                inputs=[droid_policy.DroidInputs(action_dim=model.action_dim, model_type=ModelType.PI0_FAST)],
+                outputs=[droid_policy.DroidOutputs()],
+            ),
+            base_config=DataConfig(
+                prompt_from_task=True,
+            ),
+            model_transforms=ModelTransformFactory(
+                fast_model_tokenizer=_tokenizer.FASTTokenizer,
+                fast_model_tokenizer_kwargs={"fast_tokenizer_path": "KarlP/fast_droid_specialist"},
+            ),
+        ),
+    ),
+    TrainConfig(
+        name="paligemma_vq_droid",
+        model=pi0_fast.Pi0FASTConfig(action_dim=8, action_horizon=15),
+        data=SimpleDataConfig(
+            assets=AssetsConfig(asset_id="droid"),
+            data_transforms=lambda model: _transforms.Group(
+                inputs=[droid_policy.DroidInputs(action_dim=model.action_dim, model_type=ModelType.PI0_FAST)],
+                outputs=[droid_policy.DroidOutputs()],
+            ),
+            base_config=DataConfig(
+                prompt_from_task=True,
+            ),
+            model_transforms=ModelTransformFactory(
+                fast_model_tokenizer=_tokenizer.FSQTokenizer,
+                fast_model_tokenizer_kwargs={
+                    "fsq_tokenizer_path": "s3://openpi-assets-simeval/tokenizers/droid_fsq_tokenizer"
+                },
+            ),
+        ),
+    ),
+    TrainConfig(
+        name="paligemma_diffusion_droid",
+        model=pi0.Pi0Config(action_horizon=10, action_dim=8),
+        data=SimpleDataConfig(
+            assets=AssetsConfig(asset_id="droid"),
+            data_transforms=lambda model: _transforms.Group(
+                inputs=[droid_policy.DroidInputs(action_dim=model.action_dim)],
                 outputs=[droid_policy.DroidOutputs()],
             ),
             base_config=DataConfig(

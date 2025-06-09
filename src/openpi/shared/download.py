@@ -93,7 +93,7 @@ def maybe_download(url: str, *, force_download: bool = False, **kwargs) -> pathl
             logger.info(f"Downloading {url} to {local_path}")
             scratch_path = local_path.with_suffix(".partial")
 
-            if _is_openpi_url(url):
+            if _is_openpi_url(url) or _is_openpi_simeval_url(url):
                 # Download without credentials.
                 _download_boto3(
                     url,
@@ -299,6 +299,9 @@ def _is_openpi_url(url: str) -> bool:
     """Check if the url is an OpenPI S3 bucket url."""
     return url.startswith("s3://openpi-assets/")
 
+def _is_openpi_simeval_url(url: str) -> bool:
+    """Check if the url is an OpenPI simeval S3 bucket url."""
+    return url.startswith("s3://openpi-assets-simeval/")
 
 def _get_mtime(year: int, month: int, day: int) -> float:
     """Get the mtime of a given date at midnight UTC."""
