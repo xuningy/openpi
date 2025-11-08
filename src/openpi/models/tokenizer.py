@@ -1,10 +1,13 @@
 import logging
 import os
 
+import jax
 import numpy as np
+import orbax.checkpoint as ocp
 import sentencepiece
 from transformers import AutoProcessor
 
+import openpi.models.utils.fsq_tokenizer as fsq_tokenizer
 import openpi.shared.download as download
 
 
@@ -16,10 +19,18 @@ class PaligemmaTokenizer:
         with path.open("rb") as f:
             self._tokenizer = sentencepiece.SentencePieceProcessor(model_proto=f.read())
 
-    def tokenize(self, prompt: str) -> tuple[np.ndarray, np.ndarray]:
+    def tokenize(self, prompt: str, state: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
         cleaned_text = prompt.strip().replace("_", " ").replace("\n", " ")
-        # tokenize "\n" separately as the "start of answer" token
-        tokens = self._tokenizer.encode(cleaned_text, add_bos=True) + self._tokenizer.encode("\n")
+        if state is not None:
+            # This is the Pi05 format, where the state is part of the discrete language input.
+            discretized_state = np.digitize(state, bins=np.linspace(-1, 1, 256 + 1)[:-1]) - 1
+            state_str = " ".join(map(str, discretized_state))
+            full_prompt = f"Task: {cleaned_text}, State: {state_str};\nAction: "
+            tokens = self._tokenizer.encode(full_prompt, add_bos=True)
+        else:
+            # This is the Pi0 format, where the state is part of the continuous action expert input.
+            # tokenize "\n" separately as the "start of answer" token
+            tokens = self._tokenizer.encode(cleaned_text, add_bos=True) + self._tokenizer.encode("\n")
         tokens_len = len(tokens)
         if tokens_len < self._max_len:
             padding = [False] * (self._max_len - tokens_len)
@@ -72,7 +83,7 @@ class FASTTokenizer:
             postfix_tokens = (
                 self._paligemma_tokenizer.encode("Action: ")
                 + action_tokens_in_pg.tolist()
-                + self._paligemma_tokenizer.encode("|")
+                + self._paligemma_tokenizer.encode("|", add_eos=True)
             )
         else:
             postfix_tokens = []
@@ -128,7 +139,17 @@ class FASTTokenizer:
         return self._paligemma_tokenizer.vocab_size() - 1 - self._fast_skip_tokens - tokens
 
 
+###########################################################################
+## The tokenizers below are used for RoboArena baseline implementations. ##
+## They are *not* used for pi0-style models.                             ##
+###########################################################################
+
+
 class BinningTokenizer:
+    """
+    Standard RT-2 / OpenVLA style binning tokenizer.
+    """
+
     def __init__(self, max_len: int = 256, n_bins: int = 256):
         self._max_len = max_len
         self._n_bins = n_bins
@@ -143,6 +164,19 @@ class BinningTokenizer:
     def tokenize(
         self, prompt: str, state: np.ndarray, actions: np.ndarray | None
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Tokenize a prompt and state into a sequence of tokens.
+
+        Args:
+            prompt: The text prompt to tokenize.
+            state: The state array to discretize and tokenize.
+            actions: Must be None. Action encoding is not currently supported.
+
+        Returns:
+            A tuple of (tokens, token_mask, ar_mask, targets).
+
+        Raises:
+            NotImplementedError: If actions is not None.
+        """
         cleaned_text = prompt.lower().strip().replace("_", " ")
 
         # Convention: state gets discretized into 256 discrete bins (assumed range after normalization: [-1, 1])
@@ -210,12 +244,11 @@ class BinningTokenizer:
 
 
 class FSQTokenizer:
+    """
+    FSQ tokenizer from the FAST paper baselines.
+    """
+
     def __init__(self, max_len: int = 256, fsq_tokenizer_path: str | None = None):
-        import jax
-        import orbax.checkpoint as ocp
-
-        import openpi.models.fsq_tokenizer_v2 as fsq_tokenizer
-
         self._max_len = max_len
 
         assert fsq_tokenizer_path is not None, "fsq_tokenizer_path must be provided"
@@ -323,8 +356,6 @@ class FSQTokenizer:
         )
         action_tokens = self._act_tokens_to_paligemma_tokens(raw_action_tokens)
         try:
-            import jax
-
             # Move computation to CPU and compile on-demand
             device = jax.devices("cpu")[0]
             with jax.default_device(device):
