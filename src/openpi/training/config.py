@@ -696,7 +696,7 @@ _CONFIGS = [
     ),
     TrainConfig(
         name="pi0_droid_jointpos",
-        model=pi0.Pi0Config(action_horizon=10),
+        model=pi0_config.Pi0Config(action_horizon=10),
         data=SimpleDataConfig(
             assets=AssetsConfig(asset_id="droid"),
             data_transforms=lambda model: _transforms.Group(
@@ -714,7 +714,8 @@ _CONFIGS = [
         data=SimpleDataConfig(
             assets=AssetsConfig(asset_id="droid"),
             data_transforms=lambda model: _transforms.Group(
-                inputs=[droid_policy.DroidInputs(action_dim=model.action_dim, model_type=ModelType.PI0_FAST)],
+                inputs=[droid_policy.DroidInputs(model_type=ModelType.PI0_FAST)],
+                # inputs=[droid_policy.DroidInputs(action_dim=model.action_dim, model_type=ModelType.PI0_FAST)],
                 outputs=[
                     _transforms.AbsoluteActions(_transforms.make_bool_mask(7, -1)),
                     droid_policy.DroidOutputs(),
@@ -816,7 +817,7 @@ _CONFIGS = [
     ),
     TrainConfig(
         name="paligemma_diffusion_droid",
-        model=pi0.Pi0Config(action_horizon=10, action_dim=8),
+        model=pi0_config.Pi0Config(action_horizon=10, action_dim=8),
         data=SimpleDataConfig(
             assets=AssetsConfig(asset_id="droid"),
             data_transforms=lambda model: _transforms.Group(
@@ -1120,7 +1121,7 @@ _CONFIGS = [
     ),
     TrainConfig(
         name="pi0_ur5",
-        model=pi0.Pi0Config(),
+        model=pi0_config.Pi0Config(),
         data=LeRobotUR5DataConfig(
             repo_id="xuningy/ur5_dataset",
             # This config lets us reload the UR5 normalization stats from the base model checkpoint.
@@ -1131,7 +1132,7 @@ _CONFIGS = [
                 asset_id="ur5e",
             ),
             base_config=DataConfig(
-                local_files_only=True,  # True, if dataset is saved locally.
+                # local_files_only=True,  # True, if dataset is saved locally.
                 # This flag determines whether we load the prompt (i.e. the task instruction) from the
                 # ``task`` field in the LeRobot dataset. The recommended setting is True.
                 prompt_from_task=True,
@@ -1179,7 +1180,7 @@ _CONFIGS = [
     #
     # RoboArena configs.
     #
-    *roboarena_config.get_roboarena_configs(),
+    # *roboarena_config.get_roboarena_configs(),
 ]
 
 if len({config.name for config in _CONFIGS}) != len(_CONFIGS):
