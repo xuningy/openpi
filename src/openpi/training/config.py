@@ -700,7 +700,7 @@ _CONFIGS = [
         data=SimpleDataConfig(
             assets=AssetsConfig(asset_id="droid"),
             data_transforms=lambda model: _transforms.Group(
-                inputs=[droid_policy.DroidInputs(action_dim=model.action_dim)],
+                inputs=[droid_policy.DroidInputs(model_type=ModelType.PI0)],
                 outputs=[_transforms.AbsoluteActions(_transforms.make_bool_mask(7, -1)), droid_policy.DroidOutputs()],
             ),
             base_config=DataConfig(
