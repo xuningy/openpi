@@ -139,14 +139,11 @@ class ModelTransformFactory(GroupFactory):
                     ],
                 )
             case _model.ModelType.PI0_FAST:
+                # Check self first (from ModelTransformFactory), then model_config
                 tokenizer_cls = (
-                    _tokenizer.FASTTokenizer
-                    if model_config.fast_model_tokenizer is None
-                    else model_config.fast_model_tokenizer
+                    self.fast_model_tokenizer or model_config.fast_model_tokenizer or _tokenizer.FASTTokenizer
                 )
-                tokenizer_kwargs = (
-                    {} if model_config.fast_model_tokenizer_kwargs is None else model_config.fast_model_tokenizer_kwargs
-                )
+                tokenizer_kwargs = self.fast_model_tokenizer_kwargs or model_config.fast_model_tokenizer_kwargs or {}
                 return _transforms.Group(
                     inputs=[
                         _transforms.InjectDefaultPrompt(self.default_prompt),
